@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CyberDarkNet</title>
+    <script>
+      // GitHub Pages SPA workaround: save path to sessionStorage and redirect to index
+      var path = window.location.pathname;
+      var query = window.location.search;
+      var hash = window.location.hash;
+      sessionStorage.setItem("spa_redirect", path + query + hash);
+      window.location.replace("/lilitop/");
+    </script>
+  </head>
+  <body></body>
+</html>
