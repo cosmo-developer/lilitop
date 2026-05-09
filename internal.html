@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberDarkNet — Crypto Internals</title>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --bg2: #13131a;
+      --bg3: #1a1a24;
+      --border: #2a2a3a;
+      --text: #e2e2e8;
+      --muted: #8888aa;
+      --accent: #7c6af7;
+      --accent2: #5ba8ff;
+      --green: #3dd68c;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --code-bg: #0a0a10;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0d0d1a 0%, #131326 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 64px 24px 48px;
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124, 106, 247, 0.15);
+      border: 1px solid rgba(124, 106, 247, 0.35);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 24px;
+    }
+
+    .badge::before { content: "⬡"; font-size: 10px; }
+
+    h1 {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 0%, #a89cf7 60%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+
+    .subtitle {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 32px;
+    }
+
+    .meta {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 64px 24px;
+    }
+
+    /* ── TL;DR box ── */
+    .tldr {
+      background: linear-gradient(135deg, rgba(124,106,247,0.08), rgba(91,168,255,0.06));
+      border: 1px solid rgba(124,106,247,0.3);
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 56px;
+    }
+
+    .tldr-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .tldr p { color: #c8c8e0; font-size: 15px; }
+
+    /* ── Section headings ── */
+    h2 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 64px 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h2 .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(124,106,247,0.15);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #d0d0e8;
+      margin: 36px 0 14px;
+    }
+
+    h3::before {
+      content: "▸ ";
+      color: var(--accent);
+      font-size: 12px;
+    }
+
+    p { color: #c0c0d8; margin-bottom: 16px; }
+
+    strong { color: #e8e8f8; }
+
+    /* ── Code blocks ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow-x: auto;
+      margin: 20px 0 28px;
+      position: relative;
+    }
+
+    pre code {
+      display: block;
+      padding: 20px 24px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #c9d1d9;
+      white-space: pre;
+    }
+
+    .code-label {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 0 10px 0 8px;
+    }
+
+    /* Syntax highlights */
+    .kw  { color: #ff79c6; }
+    .ty  { color: #8be9fd; }
+    .fn  { color: #50fa7b; }
+    .cm  { color: #6272a4; font-style: italic; }
+    .st  { color: #f1fa8c; }
+    .nu  { color: #bd93f9; }
+    .op  { color: #ff79c6; }
+
+    code:not(pre code) {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      color: #a89cf7;
+    }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin: 20px 0 28px; border-radius: 10px; border: 1px solid var(--border); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead { background: var(--bg3); }
+
+    thead th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(124,106,247,0.04); }
+
+    td {
+      padding: 12px 16px;
+      color: #c0c0d8;
+      vertical-align: top;
+    }
+
+    td:first-child { font-family: monospace; font-size: 13px; color: #a89cf7; }
+
+    .yes { color: var(--green); font-weight: 600; }
+    .no  { color: var(--red); font-weight: 600; }
+    .na  { color: var(--muted); }
+
+    /* ── Key flow diagram ── */
+    .flow-diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px 28px;
+      margin: 24px 0 32px;
+      overflow-x: auto;
+    }
+
+    .flow-diagram pre {
+      background: none;
+      border: none;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .flow-diagram pre code {
+      padding: 0;
+      font-size: 12.5px;
+      color: #8899bb;
+    }
+
+    /* ── DH table ── */
+    .dh-table td:nth-child(2),
+    .dh-table td:nth-child(3) { color: #8be9fd; }
+    .dh-table td:nth-child(4) { color: #6272a4; font-style: italic; }
+
+    /* ── Warning box ── */
+    .warning {
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 10px;
+      padding: 18px 22px;
+      margin: 24px 0;
+      font-size: 14px;
+      color: #e8b4b4;
+    }
+
+    .warning strong { color: var(--red); }
+
+    /* ── Scenario blocks ── */
+    .scenario {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 10px 10px 0;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+
+    .scenario-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .scenario p { margin-bottom: 8px; font-size: 14.5px; }
+    .scenario p:last-child { margin-bottom: 0; }
+
+    .gets { color: var(--yellow); }
+    .not  { color: var(--green); }
+
+    /* ── Invariants ── */
+    .invariants {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin: 24px 0;
+    }
+
+    .invariant {
+      display: flex;
+      gap: 14px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14.5px;
+    }
+
+    .invariant:last-child { border-bottom: none; padding-bottom: 0; }
+    .invariant:first-child { padding-top: 0; }
+
+    .inv-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: rgba(248,113,113,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* ── Algorithm table ── */
+    .algo-table td:nth-child(2) { color: #50fa7b; }
+    .algo-table td:nth-child(3) { color: #8be9fd; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      pre code { font-size: 11.5px; padding: 16px; }
+      h2 { font-size: 22px; }
+      .flow-diagram { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Technical Deep-Dive</div>
+  <h1>CyberDarkNet Crypto Internals</h1>
+  <p class="subtitle">How end-to-end encryption works, why the server cannot decrypt your messages, and where every key lives.</p>
+  <div class="meta">
+    <span>🔐 Zero-Trust Architecture</span>
+    <span>⚡ Signal Protocol</span>
+    <span>🦀 Rust + ring + aes-gcm</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p>The server is a blind courier. It stores ciphertext it cannot read, routes packets it cannot inspect, and verifies signatures it did not produce. All keys that matter live only on client devices. Here is exactly how.</p>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🤔</span> The Problem This Solves</h2>
+
+  <p>Traditional chat servers are trusted third parties. Even with HTTPS, the server decrypts your message, stores it in plaintext, and re-encrypts it for the recipient. If the server is compromised — by a hacker, a subpoena, or a rogue admin — every message is exposed.</p>
+
+  <p>CyberDarkNet inverts this. The server only ever sees:</p>
+  <ul style="color:#c0c0d8; padding-left:28px; margin-bottom:20px; line-height:2;">
+    <li><strong>Ciphertext blobs</strong> (BYTEA columns it cannot interpret)</li>
+    <li><strong>Public keys</strong> (by definition, meant to be public)</li>
+    <li><strong>Message metadata</strong> (sender device ID, conversation ID, timestamps)</li>
+  </ul>
+
+  <p>The private keys never leave the client. The server does not have them. Even if you hand an attacker root access to the database, they get encrypted noise.</p>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🔑</span> Key Types in Play</h2>
+
+  <p>Two fundamentally different key types are used, each for a different job.</p>
+
+  <h3>Ed25519 Keys — Identity and Signing</h3>
+
+  <p>Ed25519 is a <strong>digital signature</strong> algorithm. A private key signs data; anyone with the corresponding public key can verify the signature. It proves <em>who created something</em>, not <em>who can read something</em>.</p>
+
+  <p><strong>Used for:</strong></p>
+  <ul style="color:#c0c0d8; padding-left:28px; margin-bottom:16px; line-height:2;">
+    <li>Device identity: each device registers an <code>identity_key</code> (Ed25519 public key)</li>
+    <li>Signed prekeys: the device signs its X25519 prekey so recipients know it wasn't swapped by the server</li>
+    <li>Federation: servers sign their handshake and relay packets to prevent impersonation</li>
+  </ul>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/keys.rs</div>
+    <pre><code><span class="kw">pub struct</span> <span class="ty">Ed25519KeyPair</span> {
+    <span class="kw">pub</span> signing_key:   <span class="ty">SigningKey</span>,    <span class="cm">// private — never leaves device</span>
+    <span class="kw">pub</span> verifying_key: <span class="ty">VerifyingKey</span>, <span class="cm">// public  — uploaded to server</span>
+}</code></pre>
+  </div>
+
+  <p>The server <strong>stores</strong> Ed25519 public keys but <strong>cannot produce</strong> valid signatures with them. A compromised server cannot forge device identity.</p>
+
+  <h3>X25519 Keys — Key Agreement (Diffie-Hellman)</h3>
+
+  <p>X25519 is an <strong>elliptic-curve Diffie-Hellman</strong> function. Two parties each have a private/public keypair. They exchange public keys and independently compute the same shared secret, without the shared secret ever being transmitted.</p>
+
+  <p><strong>Used for:</strong></p>
+  <ul style="color:#c0c0d8; padding-left:28px; margin-bottom:16px; line-height:2;">
+    <li><code>identity_key</code> (X25519): long-term device DH key</li>
+    <li><code>signed_prekey</code> (X25519): medium-term DH key, rotated periodically</li>
+    <li><code>one_time_prekeys</code> (X25519): single-use DH keys, consumed one per session</li>
+  </ul>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/keys.rs</div>
+    <pre><code><span class="kw">impl</span> <span class="ty">X25519KeyPair</span> {
+    <span class="kw">pub fn</span> <span class="fn">diffie_hellman</span>(&amp;<span class="kw">self</span>, their_pub: &amp;[<span class="ty">u8</span>; <span class="nu">32</span>]) -&gt; [<span class="ty">u8</span>; <span class="nu">32</span>] {
+        x25519(<span class="kw">self</span>.secret, *their_pub) <span class="cm">// both sides compute same result</span>
+    }
+}</code></pre>
+  </div>
+
+  <p>The server stores <strong>only the public halves</strong>. The private halves stay on the device. Without private keys, DH outputs cannot be computed.</p>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">📋</span> Phase 1: Device Registration</h2>
+
+  <p>When a device first connects, it uploads a <strong>prekey bundle</strong> — a collection of public keys:</p>
+
+  <div style="position:relative">
+    <div class="code-label">HTTP</div>
+    <pre><code>POST /api/v1/devices/register
+{
+  <span class="st">"identity_key"</span>:            <span class="st">"&lt;Ed25519 public, base64&gt;"</span>,
+  <span class="st">"signed_prekey"</span>:           <span class="st">"&lt;X25519 public, base64&gt;"</span>,
+  <span class="st">"signed_prekey_signature"</span>: <span class="st">"&lt;Ed25519 sig of signed_prekey, base64&gt;"</span>,
+  <span class="st">"one_time_prekeys"</span>: [
+    { <span class="st">"key_id"</span>: <span class="nu">1</span>, <span class="st">"public_key"</span>: <span class="st">"&lt;X25519 public, base64&gt;"</span> },
+    { <span class="st">"key_id"</span>: <span class="nu">2</span>, <span class="st">"public_key"</span>: <span class="st">"&lt;X25519 public, base64&gt;"</span> }
+  ]
+}</code></pre>
+  </div>
+
+  <p>The server performs one critical check before storing:</p>
+
+  <div style="position:relative">
+    <div class="code-label">src/api/devices.rs</div>
+    <pre><code><span class="fn">verify_signed_prekey</span>(
+    &amp;req.identity_key,           <span class="cm">// Ed25519 verifying key</span>
+    &amp;req.signed_prekey,          <span class="cm">// X25519 public key (as bytes)</span>
+    &amp;req.signed_prekey_signature <span class="cm">// Ed25519 sig of those bytes</span>
+)</code></pre>
+  </div>
+
+  <p>This confirms the <code>signed_prekey</code> was produced by the same device that owns the <code>identity_key</code>. The server cannot fake this relationship — it does not have the Ed25519 private key needed to produce the signature.</p>
+
+  <p>After this, public keys are stored in PostgreSQL and the server has nothing useful for decryption — it never had the private keys to begin with.</p>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🤝</span> Phase 2: Session Initiation — X3DH</h2>
+
+  <p>Before Alice can send Bob a message, they need a shared secret. They have never talked before. The server cannot learn the secret. This is solved by <strong>Extended Triple Diffie-Hellman (X3DH)</strong>, the same algorithm Signal uses.</p>
+
+  <h3>Alice fetches Bob's prekey bundle</h3>
+
+  <div style="position:relative">
+    <div class="code-label">HTTP</div>
+    <pre><code>GET /api/v1/devices/{bob_device_id}/prekey-bundle
+→ {
+    identity_key, signed_prekey, signed_prekey_signature,
+    one_time_prekey  <span class="cm">// consumed — server marks it used, can't replay</span>
+  }</code></pre>
+  </div>
+
+  <h3>Alice runs X3DH locally</h3>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/x3dh.rs</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">initiate</span>(
+    alice_identity_priv: [<span class="ty">u8</span>; <span class="nu">32</span>],   <span class="cm">// Alice's private key — never sent</span>
+    alice_ephemeral_priv: [<span class="ty">u8</span>; <span class="nu">32</span>],  <span class="cm">// fresh random key — never sent</span>
+    bob_bundle: &amp;<span class="ty">PrekeyBundle</span>,       <span class="cm">// what server returned</span>
+) -&gt; ([<span class="ty">u8</span>; <span class="nu">32</span>], <span class="ty">X3DHMessage</span>)         <span class="cm">// (shared_secret, what to send Bob)</span></code></pre>
+  </div>
+
+  <p>Four DH operations are combined. Each one adds a layer of security:</p>
+
+  <div class="table-wrap">
+    <table class="dh-table">
+      <thead>
+        <tr>
+          <th>Operation</th>
+          <th>Alice's key</th>
+          <th>Bob's key</th>
+          <th>Security property</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>DH1</td><td>Identity (private)</td><td>Signed prekey (public)</td><td>Authenticates Alice</td></tr>
+        <tr><td>DH2</td><td>Ephemeral (private)</td><td>Identity (public)</td><td>Authenticates Bob</td></tr>
+        <tr><td>DH3</td><td>Ephemeral (private)</td><td>Signed prekey (public)</td><td>Forward secrecy</td></tr>
+        <tr><td>DH4</td><td>Ephemeral (private)</td><td>One-time prekey (public)</td><td>Deniability + extra secrecy</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/x3dh.rs</div>
+    <pre><code><span class="kw">let</span> dh1 = <span class="fn">x25519</span>(alice_identity_priv,  bob_spk);
+<span class="kw">let</span> dh2 = <span class="fn">x25519</span>(alice_ephemeral_priv, bob_ik);
+<span class="kw">let</span> dh3 = <span class="fn">x25519</span>(alice_ephemeral_priv, bob_spk);
+<span class="kw">let</span> dh4 = <span class="fn">x25519</span>(alice_ephemeral_priv, bob_opk); <span class="cm">// if one-time prekey exists</span></code></pre>
+  </div>
+
+  <p>These four outputs are concatenated and fed into HKDF-SHA256:</p>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/kdf.rs</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">x3dh_kdf</span>(dh_outputs: &amp;[&amp;[<span class="ty">u8</span>; <span class="nu">32</span>]]) -&gt; [<span class="ty">u8</span>; <span class="nu">32</span>] {
+    <span class="kw">let mut</span> ikm = F.to_vec(); <span class="cm">// 32×0xFF padding prefix (per X3DH spec)</span>
+    <span class="kw">for</span> dh <span class="kw">in</span> dh_outputs { ikm.extend_from_slice(*dh); }
+    <span class="fn">hkdf_sha256</span>(&amp;[<span class="nu">0u8</span>; <span class="nu">32</span>], &amp;ikm, <span class="st">b"cyberdarknet-x3dh-v1"</span>)
+}</code></pre>
+  </div>
+
+  <p>Alice now has a 32-byte <code>shared_secret</code>. She sends Bob her public ephemeral key and identity key (the <code>X3DHMessage</code>). The server relays this header alongside the ciphertext.</p>
+
+  <h3>Bob reconstructs the same secret</h3>
+
+  <p>Bob runs the DH operations in reverse order but arrives at the same 32-byte secret. The server watched the key exchange but cannot compute any of the DH outputs — it only ever saw public keys.</p>
+
+  <div class="warning">
+    <strong>Why the server is blind here:</strong> Each DH output requires one private key. The server has zero private keys in these exchanges — all private keys were generated locally on devices and never transmitted.
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🔄</span> Phase 3: Ongoing Messages — Double Ratchet</h2>
+
+  <p>X3DH establishes one shared secret. But using the same key for every message is dangerous: if one key leaks, all past and future messages are exposed. The <strong>Double Ratchet</strong> solves this by deriving a new encryption key for every single message.</p>
+
+  <h3>Symmetric Ratchet — chain key → message key</h3>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/kdf.rs</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">kdf_ck</span>(chain_key: &amp;[<span class="ty">u8</span>; <span class="nu">32</span>]) -&gt; ([<span class="ty">u8</span>; <span class="nu">32</span>], [<span class="ty">u8</span>; <span class="nu">32</span>]) {
+    <span class="kw">let</span> msg_key = <span class="fn">hmac_sha256</span>(chain_key, &amp;[<span class="nu">0x01</span>]); <span class="cm">// key for this message</span>
+    <span class="kw">let</span> new_ck  = <span class="fn">hmac_sha256</span>(chain_key, &amp;[<span class="nu">0x02</span>]); <span class="cm">// advance the chain</span>
+    (new_ck, msg_key)
+}</code></pre>
+  </div>
+
+  <p>Each call advances the chain and produces a one-use message key. Knowing message key #5 does not let you derive message key #4 (HMAC is one-way). This gives <strong>forward secrecy</strong> within a chain.</p>
+
+  <h3>DH Ratchet — root key refresh</h3>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/kdf.rs</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">kdf_rk</span>(root_key: &amp;[<span class="ty">u8</span>; <span class="nu">32</span>], dh_output: &amp;[<span class="ty">u8</span>; <span class="nu">32</span>]) -&gt; ([<span class="ty">u8</span>; <span class="nu">32</span>], [<span class="ty">u8</span>; <span class="nu">32</span>]) {
+    <span class="kw">let</span> derived = <span class="fn">hkdf_sha256</span>(root_key, dh_output, <span class="st">b"cyberdarknet-ratchet-v1"</span>);
+    <span class="kw">let</span> new_rk = <span class="fn">hkdf_sha256</span>(&amp;derived, &amp;[<span class="nu">0x01</span>], RATCHET_INFO);
+    <span class="kw">let</span> new_ck = <span class="fn">hkdf_sha256</span>(&amp;derived, &amp;[<span class="nu">0x02</span>], RATCHET_INFO);
+    (new_rk, new_ck)
+}</code></pre>
+  </div>
+
+  <p>Every time the conversation direction flips (Alice sends, then Bob replies), a new DH exchange happens inline. This rotates the root key. An attacker who steals the root key at time <em>T</em> cannot decrypt messages from before <em>T</em> (<strong>forward secrecy</strong>) and cannot predict keys after <em>T</em> is rotated (<strong>break-in recovery</strong>).</p>
+
+  <h3>Message Encryption — AES-256-GCM</h3>
+
+  <div style="position:relative">
+    <div class="code-label">src/crypto/aes.rs</div>
+    <pre><code><span class="kw">pub fn</span> <span class="fn">encrypt</span>(key: &amp;[<span class="ty">u8</span>; <span class="nu">32</span>], plaintext: &amp;[<span class="ty">u8</span>]) -&gt; <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;, <span class="ty">AppError</span>&gt; {
+    <span class="cm">// random 12-byte nonce, unique per message</span>
+    <span class="ty">OsRng</span>.<span class="fn">fill_bytes</span>(&amp;<span class="kw">mut</span> nonce_bytes);
+    <span class="cm">// output layout: nonce(12 bytes) || ciphertext+tag</span>
+    out.<span class="fn">extend_from_slice</span>(&amp;nonce_bytes);
+    out.<span class="fn">extend_from_slice</span>(&amp;ciphertext);
+}</code></pre>
+  </div>
+
+  <p>The server receives and stores only this <code>nonce || ciphertext</code> blob. The 16-byte GCM authentication tag is embedded in the ciphertext — if anyone tampers with the blob, decryption fails with an authentication error. The server stores it but has no message key to run <code>decrypt()</code> with.</p>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">📦</span> What the Server Stores vs What It Knows</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Data</th><th>Stored in DB</th><th>Server can read it?</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Message content</td>
+          <td><code>messages.payload</code> — BYTEA ciphertext</td>
+          <td class="no">No — no decryption key</td>
+        </tr>
+        <tr>
+          <td>Ed25519 identity keys</td>
+          <td><code>devices.identity_key</code></td>
+          <td class="yes">Yes — but these are <em>public</em> by design</td>
+        </tr>
+        <tr>
+          <td>X25519 prekeys (public)</td>
+          <td><code>devices.signed_prekey</code>, <code>one_time_prekeys</code></td>
+          <td class="yes">Yes — but <em>public</em>, DH requires private half</td>
+        </tr>
+        <tr>
+          <td>Ed25519 private keys</td>
+          <td>Never uploaded</td>
+          <td class="na">N/A — never transmitted</td>
+        </tr>
+        <tr>
+          <td>X25519 private keys</td>
+          <td>Never uploaded</td>
+          <td class="na">N/A — never transmitted</td>
+        </tr>
+        <tr>
+          <td>Session shared secret</td>
+          <td>Never transmitted</td>
+          <td class="na">N/A — derived locally by each device</td>
+        </tr>
+        <tr>
+          <td>Message keys</td>
+          <td>Never transmitted</td>
+          <td class="na">N/A — derived locally from ratchet</td>
+        </tr>
+        <tr>
+          <td>Ratchet state</td>
+          <td>Never transmitted</td>
+          <td class="na">N/A — maintained on client</td>
+        </tr>
+        <tr>
+          <td>User passwords</td>
+          <td>Argon2id hash only</td>
+          <td class="no">Hash only — not reversible</td>
+        </tr>
+        <tr>
+          <td>JWT signing secret</td>
+          <td>Memory only (<code>TOKEN_SECRET</code> env)</td>
+          <td class="yes">Yes — but proves auth, not decrypts messages</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🗺</span> Full Key Flow — End to End</h2>
+
+  <div class="flow-diagram">
+    <pre><code>DEVICE SIDE                              SERVER SIDE
+───────────────────────────────────────  ────────────────────────────────────
+
+[Registration]
+Generate Ed25519 keypair (IK)
+Generate X25519 keypair (SPK)
+Sign SPK with IK private key
+Generate N × X25519 one-time prekeys
+                                    ──→  Store: IK_pub, SPK_pub, sig, OTPKs
+                                         Verify: sig(IK_priv, SPK_pub) valid?
+                                         ✓ store  ✗ reject
+
+[Alice starts conversation with Bob]
+                                    ←──  Serve Bob's prekey bundle
+                                         (IK_pub, SPK_pub, one OTPK_pub)
+                                         Mark OTPK as used
+
+Compute X3DH locally:
+  dh1 = x25519(Alice_IK_priv,  Bob_SPK_pub)
+  dh2 = x25519(Alice_EK_priv,  Bob_IK_pub)
+  dh3 = x25519(Alice_EK_priv,  Bob_SPK_pub)
+  dh4 = x25519(Alice_EK_priv,  Bob_OTPK_pub)
+  shared_secret = HKDF(dh1 ‖ dh2 ‖ dh3 ‖ dh4)
+  ↑ server never sees this
+
+Init Double Ratchet with shared_secret
+Encrypt message with ratchet message key
+  ct = AES-256-GCM(msg_key, plaintext)
+  header = { Alice_IK_pub, Alice_EK_pub,
+             ratchet_pub, msg_counter }
+
+                                    ──→  Store ct (BYTEA)
+                                         pg_notify → WebSocket → Bob's device
+                                         Server sees: encrypted blob + header
+
+[Bob receives]
+                                    ←──  Deliver ciphertext + X3DH header
+
+Reconstruct X3DH (uses Bob's private keys):
+  dh1 = x25519(Bob_SPK_priv,  Alice_IK_pub)
+  dh2 = x25519(Bob_IK_priv,   Alice_EK_pub)
+  dh3 = x25519(Bob_SPK_priv,  Alice_EK_pub)
+  dh4 = x25519(Bob_OTPK_priv, Alice_EK_pub)
+  shared_secret = HKDF(dh1 ‖ dh2 ‖ dh3 ‖ dh4)
+  ↑ same value as Alice's — without server involvement
+
+Init Double Ratchet, derive msg_key
+  plaintext = AES-256-GCM-Decrypt(msg_key, ct)  ✓</code></pre>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">💥</span> Compromise Scenarios</h2>
+
+  <div class="scenario">
+    <div class="scenario-title">Scenario 1 — Attacker reads the entire PostgreSQL database</div>
+    <p class="gets">Gets: All ciphertext blobs, all public prekeys, Argon2id password hashes, conversation metadata</p>
+    <p class="not">Cannot: Compute DH outputs (no private keys), decrypt any message, reverse Argon2id in any practical timeframe</p>
+    <p>Result: encrypted noise + public keys. Useless without the private keys that stayed on client devices.</p>
+  </div>
+
+  <div class="scenario">
+    <div class="scenario-title">Scenario 2 — Attacker owns the running server process</div>
+    <p class="gets">Gets: Everything above, plus <code>TOKEN_SECRET</code> (can forge JWTs), plus <code>SERVER_PRIVATE_KEY</code> (can sign fake federation packets)</p>
+    <p class="not">Cannot: Decrypt existing stored messages. Keys needed for decryption are in client device memory, not server memory.</p>
+    <p>Result: attacker can impersonate users going forward and inject fake federation packets — but cannot read any past messages.</p>
+  </div>
+
+  <div class="scenario">
+    <div class="scenario-title">Scenario 3 — Network-level man-in-the-middle</div>
+    <p class="gets">Gets: Can intercept prekey bundles in transit and swap public keys</p>
+    <p class="not">Cannot: Produce a valid Ed25519 signature for the swapped prekey without Bob's Ed25519 private key</p>
+    <p>Result: The initiating client verifies <code>signed_prekey_signature</code> against <code>identity_key</code>. Swapped prekey → invalid signature → session rejected. MITM fails.</p>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🚫</span> Hard Invariants in Code</h2>
+
+  <div class="invariants">
+    <div class="invariant">
+      <div class="inv-icon">⛔</div>
+      <div>
+        <strong>No decrypt endpoint ever.</strong>
+        <p style="margin-top:4px; font-size:14px; color:var(--muted);">The server stores only BYTEA. There is no API surface to request plaintext. Adding one would require uploading private keys first — a client-side change that would be visible and auditable.</p>
+      </div>
+    </div>
+    <div class="invariant">
+      <div class="inv-icon">⛔</div>
+      <div>
+        <strong>Never log ciphertext, keys, or tokens.</strong>
+        <p style="margin-top:4px; font-size:14px; color:var(--muted);">Log files contain only IDs, timestamps, and routing metrics. No key material ever reaches disk outside the database's encrypted BYTEA columns.</p>
+      </div>
+    </div>
+    <div class="invariant">
+      <div class="inv-icon">⛔</div>
+      <div>
+        <strong>Argon2id only for passwords.</strong>
+        <p style="margin-top:4px; font-size:14px; color:var(--muted);">Memory-hard, GPU-resistant. bcrypt and SHA-based password hashing are explicitly banned. The password only proves login — it is not involved in encryption.</p>
+      </div>
+    </div>
+    <div class="invariant">
+      <div class="inv-icon">⛔</div>
+      <div>
+        <strong><code>sender_device_id</code> is NULL for federated messages.</strong>
+        <p style="margin-top:4px; font-size:14px; color:var(--muted);">The server cannot attribute federated plaintext to a specific sender it relayed for. Even routing metadata is minimized.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">📚</span> Algorithms and Libraries</h2>
+
+  <div class="table-wrap">
+    <table class="algo-table">
+      <thead>
+        <tr><th>Purpose</th><th>Algorithm</th><th>Rust Crate</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Identity signing</td><td>Ed25519</td><td>ed25519-dalek</td></tr>
+        <tr><td>DH key agreement</td><td>X25519</td><td>x25519-dalek</td></tr>
+        <tr><td>Key derivation (X3DH, ratchet)</td><td>HKDF-SHA256</td><td>ring</td></tr>
+        <tr><td>Chain key advance</td><td>HMAC-SHA256</td><td>ring</td></tr>
+        <tr><td>Message encryption</td><td>AES-256-GCM</td><td>aes-gcm</td></tr>
+        <tr><td>Password hashing</td><td>Argon2id</td><td>argon2</td></tr>
+        <tr><td>Session authentication</td><td>HS256 JWT</td><td>jsonwebtoken</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+
+  <!-- ──────────────────────────────────────── -->
+  <h2><span class="icon">🔒</span> The Server's One Cryptographic Power</h2>
+
+  <p>The server does have one keypair: an Ed25519 key used exclusively for <strong>federation packet signing</strong>.</p>
+
+  <div style="position:relative">
+    <div class="code-label">src/main.rs</div>
+    <pre><code>server_keys: <span class="ty">Arc</span>&lt;<span class="ty">Ed25519KeyPair</span>&gt; <span class="cm">// loaded from SERVER_PRIVATE_KEY env var</span></code></pre>
+  </div>
+
+  <p>This key signs outbound federation packets so peer servers can verify the packet actually came from this server:</p>
+
+  <pre><code>canonical_bytes = packet_id | source | destination | timestamp | nonce | payload_json
+signature = Ed25519.sign(server_private_key, canonical_bytes)</code></pre>
+
+  <p>This proves <em>which server</em> sent a packet. It says nothing about message content — the messages inside packets are already ciphertext the signing server also cannot read. Authenticity without visibility.</p>
+
+</div>
+
+<footer>
+  <p>CyberDarkNet — Federated, zero-trust, E2E-encrypted messaging</p>
+  <p style="margin-top:8px;">Built on <a href="https://signal.org/docs/specifications/x3dh/">X3DH</a> and <a href="https://signal.org/docs/specifications/doubleratchet/">Double Ratchet</a> specifications &nbsp;·&nbsp; Rust + Axum + PostgreSQL</p>
+</footer>
+
+</body>
+</html>
