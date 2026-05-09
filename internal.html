@@ -310,6 +310,96 @@
     .gets { color: var(--yellow); }
     .not  { color: var(--green); }
 
+    /* ── Scenario sub-sections ── */
+    .scenario-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .scenario-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .label-gets    { color: var(--yellow); }
+    .label-cannot  { color: var(--green); }
+    .label-result  { color: var(--accent2); }
+    .label-caveat  { color: var(--red); }
+    .label-fix     { color: #a89cf7; }
+
+    .scenario-section ul {
+      padding-left: 20px;
+      line-height: 1.9;
+      font-size: 14px;
+    }
+
+    .scenario-section ul li { color: #c8c8e0; }
+
+    .scenario-result {
+      font-size: 14.5px;
+      color: #c0c0d8;
+      line-height: 1.7;
+    }
+
+    .caveat-box {
+      background: rgba(248,113,113,0.07);
+      border: 1px solid rgba(248,113,113,0.2);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-top: 4px;
+      font-size: 13.5px;
+      color: #e8b4b4;
+      line-height: 1.7;
+    }
+
+    .fix-box {
+      background: rgba(124,106,247,0.07);
+      border: 1px solid rgba(124,106,247,0.2);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-top: 4px;
+      font-size: 13.5px;
+      color: #c8c0f0;
+      line-height: 1.7;
+    }
+
+    .severity {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-radius: 4px;
+      padding: 2px 8px;
+      margin-left: 10px;
+      vertical-align: middle;
+    }
+
+    .sev-low    { background: rgba(61,214,140,0.12); color: var(--green); border: 1px solid rgba(61,214,140,0.25); }
+    .sev-medium { background: rgba(251,191,36,0.12); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+    .sev-high   { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.25); }
+
+    .scenario-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(124,106,247,0.2);
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+
     /* ── Invariants ── */
     .invariants {
       background: var(--bg2);
@@ -735,25 +825,190 @@ Init Double Ratchet, derive msg_key
   <!-- ──────────────────────────────────────── -->
   <h2><span class="icon">💥</span> Compromise Scenarios</h2>
 
+  <p style="color:var(--muted); font-size:14px; margin-bottom:24px;">Each scenario assumes progressively stronger attacker capabilities. The architecture is designed so that even total server compromise does not expose plaintext messages.</p>
+
+  <!-- ── Scenario 1 ── -->
   <div class="scenario">
-    <div class="scenario-title">Scenario 1 — Attacker reads the entire PostgreSQL database</div>
-    <p class="gets">Gets: All ciphertext blobs, all public prekeys, Argon2id password hashes, conversation metadata</p>
-    <p class="not">Cannot: Compute DH outputs (no private keys), decrypt any message, reverse Argon2id in any practical timeframe</p>
-    <p>Result: encrypted noise + public keys. Useless without the private keys that stayed on client devices.</p>
+    <div class="scenario-title">
+      <span class="scenario-num">1</span>
+      Attacker reads the entire PostgreSQL database
+      <span class="severity sev-low">Low impact</span>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-gets">What the attacker gets</div>
+      <ul>
+        <li><strong>messages.ciphertext</strong> — raw BYTEA blobs, one per message. No column for plaintext exists in the schema.</li>
+        <li><strong>devices.identity_key, devices.signed_prekey, one_time_prekeys.public_key</strong> — all public halves only. The DB schema has no <code>private_key</code> column. Private keys were generated on the device and never transmitted.</li>
+        <li><strong>users.password_hash</strong> — Argon2id hash with random salt. Not the password itself.</li>
+        <li><strong>Conversation metadata</strong> — who talked to whom, when, message counts. Content is absent.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-cannot">What the attacker cannot do</div>
+      <ul>
+        <li><strong>Decrypt any message.</strong> Every DH operation (X3DH + Double Ratchet) requires a private key. None are in the DB. The AES-256-GCM message keys are derived on-device and never stored anywhere.</li>
+        <li><strong>Reverse password hashes.</strong> Argon2id with default parameters (memory=64MB, iterations=3) makes brute-force cost roughly $50,000+ per password on modern hardware. Weak passwords remain vulnerable — strong passwords are infeasible.</li>
+        <li><strong>Reconstruct ratchet state.</strong> Ratchet chain keys advance with every message and are only held in device memory. They are not persisted to the server.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-result">Result</div>
+      <p class="scenario-result">Attacker holds encrypted noise and public keys. Without device private keys — which lived only in client memory and were never uploaded — the ciphertext is mathematically opaque. The entire database dump is worthless for reading messages.</p>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-fix">Precautions for operators</div>
+      <div class="fix-box">
+        <strong>Encrypt the database volume at rest</strong> (LUKS / cloud provider disk encryption). This protects against physical disk theft even before an attacker can query tables.<br><br>
+        <strong>Rotate <code>TOKEN_SECRET</code></strong> immediately after detecting a DB breach — all existing sessions become invalid, forcing re-login.<br><br>
+        <strong>Alert on unusual query patterns</strong> — a full table scan of <code>messages</code> or <code>devices</code> by an unknown connection is a strong breach signal.
+      </div>
+    </div>
   </div>
 
+  <!-- ── Scenario 2 ── -->
   <div class="scenario">
-    <div class="scenario-title">Scenario 2 — Attacker owns the running server process</div>
-    <p class="gets">Gets: Everything above, plus <code>TOKEN_SECRET</code> (can forge JWTs), plus <code>SERVER_PRIVATE_KEY</code> (can sign fake federation packets)</p>
-    <p class="not">Cannot: Decrypt existing stored messages. Keys needed for decryption are in client device memory, not server memory.</p>
-    <p>Result: attacker can impersonate users going forward and inject fake federation packets — but cannot read any past messages.</p>
+    <div class="scenario-title">
+      <span class="scenario-num">2</span>
+      Attacker owns the running server process (root / RCE)
+      <span class="severity sev-medium">Medium impact</span>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-gets">What the attacker gets</div>
+      <ul>
+        <li><strong>Everything from Scenario 1.</strong></li>
+        <li><strong><code>TOKEN_SECRET</code></strong> (env var) — can mint arbitrary valid JWTs for any user ID. Can impersonate any account going forward.</li>
+        <li><strong><code>SERVER_PRIVATE_KEY</code></strong> (env var) — can sign fake federation packets, impersonate this server to peers. Can inject messages into federated conversations as if they came from this server.</li>
+        <li><strong>Live WebSocket connections</strong> — can inspect the envelope of messages in flight (device IDs, conversation IDs, timestamps). The payload is still ciphertext.</li>
+        <li><strong>Future traffic</strong> — can serve malicious prekey bundles to clients that connect after the compromise.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-cannot">What the attacker cannot do</div>
+      <ul>
+        <li><strong>Decrypt any stored message.</strong> The crypto modules (<code>src/crypto/ratchet.rs</code>, <code>aes.rs</code>, <code>x3dh.rs</code>) are reference implementations only — they exist for client libraries to copy, not for server use. No API handler calls <code>decrypt()</code>. There is no code path on the server that could decrypt even if you hand it a key.</li>
+        <li><strong>Decrypt messages in flight.</strong> Messages arrive at the server already encrypted. The server's job is to store and forward bytes, not parse them. Even with process-level access, what you see in the WebSocket handler is <code>ciphertext: BYTEA</code>.</li>
+        <li><strong>Impersonate a specific device to a contact who has verified keys.</strong> Forged JWTs use a valid user UUID but can't prove device identity to a contact who has already fingerprint-verified that device's Ed25519 key.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-result">Result</div>
+      <p class="scenario-result">Serious incident — attacker controls the transport layer going forward. They can read who talks to whom, impersonate users in new conversations, and poison new sessions with fake prekey bundles. But every message sent <em>before</em> the compromise remains encrypted and unreadable. Past history is protected by forward secrecy.</p>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-caveat">Real danger: future session poisoning</div>
+      <div class="caveat-box">
+        After process compromise, the attacker can serve malicious prekey bundles for Bob's device — bundles with keys they control. If Alice starts a <em>new</em> conversation after the compromise, she would encrypt to the attacker's keys, not Bob's. This is a classic key substitution attack.<br><br>
+        This is <strong>only preventable by out-of-band key verification</strong> (comparing key fingerprints over a separate channel — like Signal's "safety numbers"). CyberDarkNet does not yet implement this UX.
+      </div>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-fix">Precautions for operators</div>
+      <div class="fix-box">
+        <strong>Use a secrets manager</strong> (HashiCorp Vault, AWS Secrets Manager) instead of env vars for <code>TOKEN_SECRET</code> and <code>SERVER_PRIVATE_KEY</code>. Secrets injected at runtime via a sidecar are harder to exfiltrate than env vars visible in <code>/proc/self/environ</code>.<br><br>
+        <strong>Run the server as a non-root user</strong> with minimal filesystem permissions. RCE as a restricted user limits lateral movement.<br><br>
+        <strong>Rotate <code>SERVER_PRIVATE_KEY</code></strong> after any suspected compromise. Peer servers will reject packets signed with the old key once you re-handshake.<br><br>
+        <strong>Implement key transparency / append-only prekey log</strong> — clients should be alerted when a device's prekey bundle changes unexpectedly (future feature).
+      </div>
+    </div>
   </div>
 
+  <!-- ── Scenario 3 ── -->
   <div class="scenario">
-    <div class="scenario-title">Scenario 3 — Network-level man-in-the-middle</div>
-    <p class="gets">Gets: Can intercept prekey bundles in transit and swap public keys</p>
-    <p class="not">Cannot: Produce a valid Ed25519 signature for the swapped prekey without Bob's Ed25519 private key</p>
-    <p>Result: The initiating client verifies <code>signed_prekey_signature</code> against <code>identity_key</code>. Swapped prekey → invalid signature → session rejected. MITM fails.</p>
+    <div class="scenario-title">
+      <span class="scenario-num">3</span>
+      Network-level man-in-the-middle (between client and server)
+      <span class="severity sev-medium">Medium impact — with important caveats</span>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-gets">What the attacker gets</div>
+      <ul>
+        <li><strong>Plaintext HTTP traffic</strong> if TLS is not used — all API calls, including prekey bundles and ciphertext uploads.</li>
+        <li><strong>With TLS:</strong> only timing and packet sizes. Content is opaque.</li>
+        <li><strong>The opportunity to swap prekey bundles in transit</strong> — if TLS is stripped or the MITM holds a valid cert (e.g., corporate proxy, rogue CA).</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-cannot">What the attacker cannot do</div>
+      <ul>
+        <li><strong>Swap only the <code>signed_prekey</code> without detection.</strong> The <code>signed_prekey_signature</code> is an Ed25519 signature of the prekey bytes, made with Bob's long-term Ed25519 private key. Replacing the prekey with their own X25519 public key produces an invalid signature. A client that verifies this before running X3DH will reject it.</li>
+        <li><strong>Forge federation packets</strong> — all inter-server packets carry a timestamp, nonce, and Ed25519 signature. Replay and substitution are detected.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-caveat">The honest caveat — two real attack vectors remain</div>
+      <div class="caveat-box">
+        <strong>Attack A — Full identity substitution:</strong> A MITM who swaps <em>both</em> <code>identity_key</code> and <code>signed_prekey</code> with their own keypair produces a perfectly valid bundle (their signature on their key). Alice has no way to detect this from the bundle alone. She encrypts to the attacker, who relays to Bob with their own session — classic man-in-the-middle. This is only defeated by out-of-band fingerprint comparison (comparing the hex of Bob's <code>identity_key</code> over a phone call). CyberDarkNet does not yet surface key fingerprints in the UI.<br><br>
+        <strong>Attack B — Client does not verify the signature:</strong> The server verifies <code>signed_prekey_signature</code> at device <em>registration</em> (<code>src/api/auth.rs:33-37</code>). But the <code>x3dh::initiate()</code> reference implementation marks this as <em>"verified separately"</em> — meaning the client library is responsible for calling <code>verify_signed_prekey()</code> before using the bundle. A client that skips this step is vulnerable to a prekey swap even without full identity substitution.
+      </div>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-result">Result</div>
+      <p class="scenario-result">With TLS and proper client-side signature verification: MITM cannot read messages. Without TLS or without client-side verification: MITM can intercept new sessions. Existing sessions (already established via X3DH) are unaffected — the attacker cannot retroactively decrypt them without the original private keys.</p>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-fix">Precautions for operators and client developers</div>
+      <div class="fix-box">
+        <strong>Always use HTTPS.</strong> TLS is the first and most important defense. Without it, every API call is readable on the wire. Use Let's Encrypt or a reverse proxy (nginx/Caddy) — never run the backend on plain HTTP in production.<br><br>
+        <strong>Client libraries must verify <code>signed_prekey_signature</code></strong> before calling <code>x3dh::initiate()</code>. The server already verified it at registration, but transport-layer tampering can swap the served value. Client re-verification closes this gap.<br><br>
+        <strong>Implement key fingerprints in the UI</strong> (future feature). Each device's <code>identity_key</code> displayed as a short hex digest or emoji sequence, comparable out-of-band. This is the only defense against a full identity substitution attack — the same mechanism Signal calls "safety numbers."<br><br>
+        <strong>Pin the server certificate</strong> in the mobile/desktop client. Prevents attacks using rogue CA certificates (corporate proxies, nation-state CAs).
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Scenario 4 ── -->
+  <div class="scenario">
+    <div class="scenario-title">
+      <span class="scenario-num">4</span>
+      Attacker compromises a client device (phone / laptop theft, malware)
+      <span class="severity sev-high">High impact — no cryptographic defense</span>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-gets">What the attacker gets</div>
+      <ul>
+        <li><strong>Everything.</strong> Device memory contains the Ed25519 private key, all X25519 private keys, the current ratchet state, and all decrypted message history cached locally.</li>
+        <li><strong>Active sessions</strong> — can send messages as that device, read all incoming messages.</li>
+        <li><strong>Identity file</strong> — if the identity JSON is accessible on the device filesystem, they can log in from a new device using the stored <code>user_id</code> + <code>device_id</code> (they still need the password).</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-cannot">What the attacker cannot do (limited)</div>
+      <ul>
+        <li><strong>Decrypt messages on other devices</strong> in the same conversation — each device has its own ratchet state. Compromising Alice's phone does not expose Bob's device.</li>
+        <li><strong>Access messages before the ratchet window</strong> — the Double Ratchet's skipped-message cache has a limit (<code>MAX_SKIP = 1000</code>). Very old messages that have been deleted from the local cache are gone.</li>
+      </ul>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-result">Result</div>
+      <p class="scenario-result">Device compromise is the hardest threat to defend against cryptographically — the keys are supposed to be on the device. The server architecture cannot help here. Defense is at the device OS level.</p>
+    </div>
+
+    <div class="scenario-section">
+      <div class="scenario-section-label label-fix">Precautions</div>
+      <div class="fix-box">
+        <strong>Device PIN / biometric lock.</strong> Physical access without unlock should not expose keys or app data.<br><br>
+        <strong>Store private keys in the platform secure enclave</strong> where possible (iOS Secure Enclave, Android Keystore, TPM on desktop). Keys stored there cannot be exported even with root access on many platforms.<br><br>
+        <strong>Password-encrypt the identity file</strong> before saving to disk. The current identity file is plaintext JSON — <code>device_id</code> and <code>user_id</code> are in it, but the private keys are not (they stay in memory). Adding AES-GCM encryption of the file with a device password would prevent trivial exfiltration.<br><br>
+        <strong>Remote device revocation.</strong> The server supports <code>DELETE /api/v1/devices/{id}</code>. Use it immediately on suspected device compromise — new sessions from that device will fail, and peer devices will stop accepting its prekey bundles.
+      </div>
+    </div>
   </div>
 
 
